@@ -33,6 +33,9 @@ export async function GET() {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('Unable to open the database') || message.includes('code 14') || message.includes('Read-only')) {
+      return NextResponse.json({ message: 'Action simulated (Vercel Read-Only Demo)' });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -53,6 +56,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: 'User created successfully' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('Unable to open the database') || message.includes('code 14') || message.includes('Read-only')) {
+      return NextResponse.json({ message: 'Action simulated (Vercel Read-Only Demo)' });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -76,6 +82,9 @@ export async function PUT(req: Request) {
     return NextResponse.json({ message: 'User updated successfully' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('Unable to open the database') || message.includes('code 14') || message.includes('Read-only')) {
+      return NextResponse.json({ message: 'Action simulated (Vercel Read-Only Demo)' });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
