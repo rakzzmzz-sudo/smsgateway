@@ -17,9 +17,14 @@ export const metadata: Metadata = {
   title: "Maxis SMS Gateway",
   description: "Web management interface for Maxis SMS Gateway",
   icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon.png', type: 'image/png' },
+    ],
+    shortcut: ['/favicon.png'],
+    apple: [
+      { url: '/apple-touch-icon.png' },
+    ],
   },
 };
 
