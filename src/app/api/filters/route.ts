@@ -1,40 +1,26 @@
 import { NextResponse } from 'next/server';
-import { jcli } from '@/lib/jcli';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    const output = await jcli.execute('filter -l');
+    const filters = await prisma.filter.findMany();
     
-    // Parse JCLI table output
-    // Example: #Fid              Type           Parameters
-    //          #filter1          UserFilter     uid=myuser
+    const formatted = filters.map(f => ({
+      fid: f.fid,
+      type: f.type,
+      parameters: f.parameter || 'None',
+    }));
     
-    const lines = output.split('\n');
-    const filters = [];
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line.startsWith('#') || line.startsWith('#Total') || line.startsWith('#Fid')) continue;
-      
-      const cleanLine = line.substring(1).trim();
-      const parts = cleanLine.split(/\s+/);
-      
-      if (parts.length >= 2) {
-        filters.push({
-          fid: parts[0],
-          type: parts[1],
-          parameters: parts.slice(2).join(' ') || 'None',
-        });
-      }
-    }
-    
-    return NextResponse.json(filters);
+    return NextResponse.json(formatted);
   } catch (error: unknown) {
     console.error('API Error:', error);
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
@@ -44,15 +30,14 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Missing filter ID' }, { status: 400 });
     }
 
-    const commands = [`filter -u ${fid}`];
-    
-    if (type) commands.push(`type ${type}`);
-    if (uid) commands.push(`uid ${uid}`);
-    
-    commands.push('ok');
-    commands.push('persist');
+    const updateData: any = {};
+    if (type) updateData.type = type;
+    if (uid) updateData.parameter = uid;
 
-    await jcli.executeSequence(commands);
+    await prisma.filter.update({
+      where: { fid },
+      data: updateData
+    });
     
     return NextResponse.json({ message: 'Filter updated successfully' });
   } catch (error: unknown) {
@@ -70,16 +55,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const commands = [
-      'filter -a',
-      `fid ${fid}`,
-      `type ${type}`,
-      `uid ${uid}`,
-      'ok',
-      'persist'
-    ];
-
-    await jcli.executeSequence(commands);
+    await prisma.filter.create({
+      data: { fid, type, parameter: uid }
+    });
     
     return NextResponse.json({ message: 'Filter created successfully' });
   } catch (error: unknown) {
@@ -97,12 +75,9 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Missing filter ID' }, { status: 400 });
     }
 
-    const commands = [
-      `filter -r ${fid}`,
-      'persist'
-    ];
-
-    await jcli.executeSequence(commands);
+    await prisma.filter.delete({
+      where: { fid }
+    });
     
     return NextResponse.json({ message: 'Filter deleted successfully' });
   } catch (error: unknown) {

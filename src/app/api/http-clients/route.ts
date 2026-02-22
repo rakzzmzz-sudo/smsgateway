@@ -1,13 +1,22 @@
 import { NextResponse } from 'next/server';
-import { jcli } from '@/lib/jcli';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    const httpOutput = await jcli.execute('httpccm -l');
-    if (httpOutput.includes('Incorrect command')) throw new Error('JCLI Error: Incorrect command httpccm');
-    const httpConnectors = parseTable(httpOutput);
+    const connectors = await prisma.httpClientConnector.findMany();
     
-    return NextResponse.json(httpConnectors);
+    const formatted = connectors.map(c => ({
+      id: c.cid,
+      type: 'HTTP',
+      service_status: 'STARTED',
+      session_status: 'BOUND',
+      url: c.url,
+      method: c.method
+    }));
+    
+    return NextResponse.json(formatted);
   } catch (error: unknown) {
     console.error('API Error:', error);
     const message = error instanceof Error ? error.message : String(error);
@@ -24,16 +33,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const commands = [
-      'httpccm -a',
-      `cid ${cid}`,
-      `url ${url}`,
-      `method ${method}`,
-      'ok',
-      'persist'
-    ];
-
-    await jcli.executeSequence(commands);
+    await prisma.httpClientConnector.create({
+      data: { cid, url, method }
+    });
     
     return NextResponse.json({ message: 'HTTP Client Connector created successfully' });
   } catch (error: unknown) {
@@ -51,12 +53,9 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Missing connector ID' }, { status: 400 });
     }
 
-    const commands = [
-      `httpccm -r ${cid}`,
-      'persist'
-    ];
-
-    await jcli.executeSequence(commands);
+    await prisma.httpClientConnector.delete({
+      where: { cid }
+    });
     
     return NextResponse.json({ message: 'HTTP Client Connector deleted successfully' });
   } catch (error: unknown) {
@@ -74,45 +73,18 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Missing connector ID' }, { status: 400 });
     }
 
-    const commands = [`httpccm -u ${cid}`];
-    
-    if (url) commands.push(`url ${url}`);
-    if (method) commands.push(`method ${method}`);
-    
-    commands.push('ok');
-    commands.push('persist');
+    const updateData: any = {};
+    if (url) updateData.url = url;
+    if (method) updateData.method = method;
 
-    await jcli.executeSequence(commands);
+    await prisma.httpClientConnector.update({
+      where: { cid },
+      data: updateData
+    });
     
     return NextResponse.json({ message: 'HTTP Client Connector updated successfully' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
-
-function parseTable(output: string) {
-  const lines = output.split('\n');
-  const items = [];
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line.startsWith('#') || line.startsWith('#Total') || line.startsWith('#Cid') || line.startsWith('#Httpcc')) continue;
-    
-    const cleanLine = line.substring(1).trim();
-    if (!cleanLine || cleanLine.toLowerCase().startsWith('incorrect')) continue;
-    
-    const parts = cleanLine.split(/\s+/);
-    
-    if (parts.length >= 2) {
-      items.push({
-        id: parts[0],
-        type: 'HTTP',
-        service_status: parts[1] || 'ND',
-        session_status: parts[2] || 'N/A',
-      });
-    }
-  }
-  
-  return items;
 }

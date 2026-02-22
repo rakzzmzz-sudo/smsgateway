@@ -1,17 +1,25 @@
 import { NextResponse } from 'next/server';
-import { jcli } from '@/lib/jcli';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    // Fetch MT Routes
-    const mtOutput = await jcli.execute('mtrouter -l');
-    const mtRoutes = parseRoutingTable(mtOutput, 'MT');
+    const routes = await prisma.route.findMany({
+      orderBy: { order: 'asc' }
+    });
     
-    // Fetch MO Routes
-    const moOutput = await jcli.execute('morouter -l');
-    const moRoutes = parseRoutingTable(moOutput, 'MO');
+    const formatted = routes.map(r => ({
+      order: r.order.toString(),
+      type: r.direction,
+      route_type: r.type,
+      rate: r.rate.toFixed(2),
+      connectors: r.connectorId || 'None',
+      filters: r.filters || 'None',
+      id: r.id
+    }));
     
-    return NextResponse.json([...mtRoutes, ...moRoutes]);
+    return NextResponse.json(formatted);
   } catch (error: unknown) {
     console.error('API Error:', error);
     const message = error instanceof Error ? error.message : String(error);
@@ -19,54 +27,38 @@ export async function GET() {
   }
 }
 
-function parseRoutingTable(output: string, type: 'MT' | 'MO') {
-  const lines = output.split('\n');
-  const routes = [];
-  
-  // Example: #Order Type                   Rate       Connector ID(s)                                  Filter(s)
-  //          #0     DefaultRoute           0.00       smppc_primary
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line.startsWith('#') || line.startsWith('#Total') || line.startsWith('#Order')) continue;
-    
-    const cleanLine = line.substring(1).trim();
-    const parts = cleanLine.split(/\s+/);
-    
-    if (parts.length >= 2) {
-      routes.push({
-        order: parts[0],
-        type,
-        route_type: parts[1],
-        rate: parts[2] || '0.00',
-        connectors: parts[3] || 'None',
-        filters: parts[4] || 'None',
-      });
-    }
-  }
-  
-  return routes;
-}
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { type, order, route_type, connector, filters } = body;
+    const { type, order, route_type, connector, filters, id } = body;
     
-    if (!type || !order) {
-      return NextResponse.json({ error: 'Missing type or order' }, { status: 400 });
+    if (!id && (!type || !order)) {
+      return NextResponse.json({ error: 'Missing unique identifier' }, { status: 400 });
     }
 
-    const cmdBase = type === 'MT' ? 'mtrouter' : 'morouter';
-    const commands = [`${cmdBase} -u ${order}`];
-    
-    if (route_type) commands.push(`type ${route_type}`);
-    if (connector) commands.push(`connector ${connector}`);
-    if (filters !== undefined) commands.push(`filters ${filters || "None"}`);
-    
-    commands.push('ok');
-    commands.push('persist');
+    const updateData: any = {};
+    if (route_type) updateData.type = route_type;
+    if (connector) updateData.connectorId = connector;
+    if (filters !== undefined) updateData.filters = filters || '';
+    if (type) updateData.direction = type;
 
-    await jcli.executeSequence(commands);
+    if (id) {
+       await prisma.route.update({
+         where: { id },
+         data: updateData
+       });
+    } else {
+       // fallback for older UI where id isn't passed but order and type are
+       const existing = await prisma.route.findFirst({
+          where: { order: parseInt(order), direction: type }
+       });
+       if(existing) {
+         await prisma.route.update({
+           where: { id: existing.id },
+           data: updateData
+         });
+       }
+    }
     
     return NextResponse.json({ message: 'Route updated successfully' });
   } catch (error: unknown) {
@@ -84,22 +76,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const cmdBase = type === 'MT' ? 'mtrouter' : 'morouter';
-    const commands = [
-      `${cmdBase} -a`,
-      `type ${route_type}`,
-      `order ${order}`,
-      `connector ${connector}`,
-    ];
-
-    if (filters) {
-      commands.push(`filters ${filters}`);
-    }
-
-    commands.push('ok');
-    commands.push('persist');
-
-    await jcli.executeSequence(commands);
+    await prisma.route.create({
+      data: {
+        order: parseInt(order, 10),
+        direction: type,
+        type: route_type,
+        connectorId: connector,
+        filters: filters || '',
+        rate: 0.0
+      }
+    });
     
     return NextResponse.json({ message: 'Route created successfully' });
   } catch (error: unknown) {
@@ -118,13 +104,15 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Missing order or type' }, { status: 400 });
     }
 
-    const cmdBase = type === 'MT' ? 'mtrouter' : 'morouter';
-    const commands = [
-      `${cmdBase} -r ${order}`,
-      'persist'
-    ];
-
-    await jcli.executeSequence(commands);
+    const existing = await prisma.route.findFirst({
+        where: { order: parseInt(order, 10), direction: type }
+    });
+    
+    if(existing) {
+       await prisma.route.delete({
+         where: { id: existing.id }
+       });
+    }
     
     return NextResponse.json({ message: 'Route deleted successfully' });
   } catch (error: unknown) {
