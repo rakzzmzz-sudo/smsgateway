@@ -13,10 +13,10 @@ export class JcliClient {
   
   constructor(config: Partial<JcliConfig> = {}) {
     this.config = {
-      host: config.host || '127.0.0.1',
-      port: config.port || 8990,
-      username: config.username || 'jcliadmin',
-      password: config.password || 'jclipwd',
+      host: config.host || process.env.JCLI_HOST || '127.0.0.1',
+      port: config.port || parseInt(process.env.JCLI_PORT || '8990', 10),
+      username: config.username || process.env.JCLI_USERNAME || 'jcliadmin',
+      password: config.password || process.env.JCLI_PASSWORD || 'jclipwd',
       timeout: config.timeout || 5000,
     };
   }
