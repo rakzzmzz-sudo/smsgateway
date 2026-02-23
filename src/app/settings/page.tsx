@@ -200,51 +200,57 @@ export default function SettingsPage() {
             <div className="p-6 border-b border-maxis-border">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <Settings className="h-5 w-5 text-maxis-green" />
-                API Connection
+                Telnet (JCLI) Connection
               </h3>
               <p className="text-sm text-maxis-muted mt-1">
-                Details for connecting to the Jasmin HTTP API Server.
+                Details for securely connecting to the Jasmin CLI Server via TCP Socket.
               </p>
             </div>
             
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-white">API Host</label>
+                  <label className="text-sm font-medium text-white">JCLI Host</label>
                   <input 
                     type="text" 
-                    defaultValue="localhost"
+                    defaultValue="127.0.0.1"
                     className="w-full px-4 py-2 bg-maxis-darker border border-maxis-border rounded-lg text-sm text-white focus:outline-none focus:border-maxis-green/50 transition-all"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-white">API Port</label>
+                  <label className="text-sm font-medium text-white">JCLI Port</label>
                   <input 
                     type="number" 
-                    defaultValue={1401}
+                    defaultValue={8990}
                     className="w-full px-4 py-2 bg-maxis-darker border border-maxis-border rounded-lg text-sm text-white focus:outline-none focus:border-maxis-green/50 transition-all"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-white">Authentication Token</label>
-                <div className="flex items-center gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-white">JCLI Username</label>
                   <input 
-                    type="password" 
-                    defaultValue="************************"
-                    readOnly
-                    className="w-full px-4 py-2 bg-maxis-darker/50 border border-maxis-border rounded-lg text-sm text-maxis-muted cursor-not-allowed"
+                    type="text" 
+                    defaultValue="jcliadmin"
+                    className="w-full px-4 py-2 bg-maxis-darker border border-maxis-border rounded-lg text-sm text-white focus:outline-none focus:border-maxis-green/50 transition-all"
                   />
-                  <button className="px-4 py-2 bg-maxis-darker border border-maxis-border rounded-lg text-sm font-medium text-white hover:bg-maxis-surface-hover transition-colors whitespace-nowrap">
-                    Regenerate
-                  </button>
                 </div>
-                <p className="text-xs text-maxis-muted flex items-center gap-1 mt-2">
-                  <AlertCircle className="h-3 w-3" />
-                  This token is used by the Web UI to securely communicate with the Jasmin interceptor.
-                </p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-white">JCLI Password</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="password" 
+                      defaultValue="jclipwd"
+                      className="w-full px-4 py-2 bg-maxis-darker border border-maxis-border rounded-lg text-sm text-white focus:outline-none focus:border-maxis-green/50 transition-all"
+                    />
+                  </div>
+                </div>
               </div>
+              <p className="text-xs text-maxis-muted flex items-center gap-1 mt-2">
+                  <AlertCircle className="h-3 w-3" />
+                  These credentials must match the `jcli_username` and `jcli_password` set in your Jasmin Core jasmin.cfg configuration.
+              </p>
             </div>
           </div>
 
