@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   return NextResponse.json({
     jasmin_version: '0.10',

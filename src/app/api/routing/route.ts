@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { jcli } from '@/lib/jcli';
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     // Fetch MT Routes
