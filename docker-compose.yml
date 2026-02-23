@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: jasmin_redis
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: jasmin_rabbitmq
+    restart: always
+    ports:
+      - "15672:15672" # RabbitMQ Management dashboard (optional)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  jasmin:
+    image: jookies/jasmin:latest
+    container_name: jasmin_core
+    restart: always
+    depends_on:
+      - redis
+      - rabbitmq
+    ports:
+      - "2775:2775" # SMPP Server
+      - "1401:1401" # HTTP API
+      - "8990:8990" # JCLI Management
+    volumes:
+      - jasmin_etc:/etc/jasmin
+      - jasmin_log:/var/log/jasmin
+
+  webui:
+    build: .
+    container_name: smsgateway_webui
+    restart: always
+    depends_on:
+      - jasmin
+    ports:
+      - "3000:3000"
+    environment:
+      # Use the container name 'jasmin' instead of 127.0.0.1 for Docker internal DNS routing
+      - JCLI_HOST=jasmin
+      - JCLI_PORT=8990
+      - JCLI_USERNAME=jcliadmin
+      - JCLI_PASSWORD=jclipwd
+
+volumes:
+  redis_data:
+  rabbitmq_data:
+  jasmin_etc:
+  jasmin_log:
