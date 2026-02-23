@@ -9,14 +9,15 @@ export async function GET() {
 
     // Mock stats generation for Vercel
     const mockStats = {
-      bind_count: users.filter(u => u.bound).length.toString(),
-      rx_sms: '112',
-      tx_sms: '450',
-      connected_clients: users.length.toString(),
-      auth_failures: '2'
+      submit_sm_count: '1450',
+      deliver_sm_count: '1440',
+      bind_rx_count: '1',
+      bind_tx_count: '0',
+      bind_trx_count: users.filter((u: { bound: boolean }) => u.bound).length.toString(),
+      connected_count: users.filter((u: { bound: boolean }) => u.bound).length.toString()
     };
 
-    const formattedUsers = users.map(u => ({
+    const formattedUsers = users.map((u: { uid: string; groupId: string; bound: boolean }) => ({
       uid: u.uid,
       gid: u.groupId,
       balance: 'ND',
@@ -81,7 +82,7 @@ export async function PUT(req: Request) {
     
     if (!uid) return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
     
-    const updateData: any = {};
+    const updateData: Record<string, string> = {};
     if (gid) updateData.groupId = gid;
     if (password) updateData.password = password;
 

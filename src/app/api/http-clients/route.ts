@@ -82,7 +82,7 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Missing connector ID' }, { status: 400 });
     }
 
-    const updateData: any = {};
+    const updateData: Record<string, string> = {};
     if (url) updateData.url = url;
     if (method) updateData.method = method;
 

@@ -9,15 +9,14 @@ export async function GET() {
 
     // Mock stats generation for Vercel
     const mockStats = {
-      rx_sms: '24',
-      tx_sms: '18',
-      rx_error_sms: '1',
-      tx_error_sms: '0',
-      connected_clients: users.length.toString(),
-      avg_throughput: '1.2 MPS'
+      request_count: '1542',
+      success_count: '1520',
+      auth_error_count: '20',
+      route_error_count: '2',
+      server_error_count: '0'
     };
 
-    const formattedUsers = users.map(u => ({
+    const formattedUsers = users.map((u: { uid: string; groupId: string }) => ({
       uid: u.uid,
       gid: u.groupId,
       balance: 'ND',
@@ -68,7 +67,7 @@ export async function PUT(req: Request) {
     
     if (!uid) return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
     
-    const updateData: any = {};
+    const updateData: Record<string, string> = {};
     if (gid) updateData.groupId = gid;
     if (password) updateData.password = password;
     
