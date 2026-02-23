@@ -12,10 +12,11 @@ async function main() {
   console.log('--- COMMENCING ENTERPRISE DEMO SEEDING ---');
 
   // 1. Groups & Users
-  console.log('1. Seeding Groups and 10 API Users...');
   await client.executeSequence(['group -a', 'gid clients_tier1', 'ok']);
   await client.executeSequence(['group -a', 'gid clients_tier2', 'ok']);
   await client.executeSequence(['group -a', 'gid internal_sys', 'ok']);
+  await client.execute('persist');
+  await client.execute('load');
 
   const userScenarios = [
     { uid: 'marketing_hq', gid: 'clients_tier1', pass: 'secret1' },
