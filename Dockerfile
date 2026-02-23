@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Install dependencies first for proper caching
 COPY package.json package-lock.json* ./
+COPY prisma ./prisma
 RUN npm ci
 
 # Copy the rest of the application
