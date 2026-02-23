@@ -41,6 +41,7 @@ async function main() {
     ]);
   }
   await client.execute('persist');
+  await client.execute('load');
 
   // 2. HTTP Client Connectors (Webhooks)
   console.log('2. Seeding 10 HTTP Client Connectors (Webhooks)...');
@@ -67,6 +68,7 @@ async function main() {
     ]);
   }
   await client.execute('persist');
+  await client.execute('load');
 
   // 3. Filters
   console.log('3. Seeding 10 Traffic Filters...');
@@ -90,6 +92,7 @@ async function main() {
     await client.executeSequence(seq);
   }
   await client.execute('persist');
+  await client.execute('load');
 
   // 4. MO Routes
   console.log('4. Seeding 10 MO Routing Scenarios...');
