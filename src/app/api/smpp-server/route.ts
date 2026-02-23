@@ -1,40 +1,18 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-
-export const dynamic = 'force-dynamic';
+import { jcli } from '@/lib/jcli';
 
 export async function GET() {
   try {
-    const users = await prisma.smppUser.findMany();
-
-    // Mock stats generation for Vercel
-    const mockStats = {
-      submit_sm_count: '1450',
-      deliver_sm_count: '1440',
-      bind_rx_count: '1',
-      bind_tx_count: '0',
-      bind_trx_count: users.filter((u: { bound: boolean }) => u.bound).length.toString(),
-      connected_count: users.filter((u: { bound: boolean }) => u.bound).length.toString()
-    };
-
-    const formattedUsers = users.map((u: { uid: string; groupId: string; bound: boolean }) => ({
-      uid: u.uid,
-      gid: u.groupId,
-      balance: 'ND',
-      mt: '0',
-      throughput: '0',
-      bound_connections: u.bound ? '1' : '0'
-    }));
+    const statsOutput = await jcli.execute('stats --smppsapi');
+    const usersOutput = await jcli.execute('user -l');
+    const userStatsOutput = await jcli.execute('stats --users');
 
     return NextResponse.json({
-      stats: mockStats,
-      users: formattedUsers
+      stats: parseStats(statsOutput),
+      users: parseUsers(usersOutput, parseUserStats(userStatsOutput))
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('Unable to open the database') || message.includes('code 14') || message.includes('Read-only')) {
-      return NextResponse.json({ message: 'Action simulated (Vercel Read-Only Demo)' });
-    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -42,25 +20,32 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, uid, gid, password } = body;
+    const { action, uid, gid, username, password } = body;
     
     if (!action || !uid) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    if (action === 'unbind' || action === 'ban') {
-      await prisma.smppUser.update({
-        where: { uid },
-        data: { bound: false }
-      });
-      return NextResponse.json({ message: `User ${uid} successfully unbound/banned` });
+    if (action === 'unbind') {
+      await jcli.execute(`user --smpp-unbind=${uid}`);
+      return NextResponse.json({ message: `User ${uid} successfully unbound` });
+    } else if (action === 'ban') {
+      await jcli.execute(`user --smpp-ban=${uid}`);
+      return NextResponse.json({ message: `User ${uid} successfully banned` });
     } else if (action === 'create') {
-      if (!gid || !password) {
+      if (!gid || !username || !password) {
         return NextResponse.json({ error: 'Missing required fields for user creation' }, { status: 400 });
       }
-      await prisma.smppUser.create({
-        data: { uid, groupId: gid, password, bound: true }
-      });
+      const commands = [
+        'user -a',
+        `uid ${uid}`,
+        `gid ${gid}`,
+        `username ${username}`,
+        `password ${password}`,
+        'ok',
+        'persist'
+      ];
+      await jcli.executeSequence(commands);
       return NextResponse.json({ message: 'User created successfully' });
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
@@ -68,9 +53,6 @@ export async function POST(req: Request) {
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('Unable to open the database') || message.includes('code 14') || message.includes('Read-only')) {
-      return NextResponse.json({ message: 'Action simulated (Vercel Read-Only Demo)' });
-    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -78,25 +60,91 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { uid, gid, password } = body;
+    const { uid, gid, username, password } = body;
     
-    if (!uid) return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
-    
-    const updateData: Record<string, string> = {};
-    if (gid) updateData.groupId = gid;
-    if (password) updateData.password = password;
+    if (!uid) {
+      return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
+    }
 
-    await prisma.smppUser.update({
-      where: { uid },
-      data: updateData
-    });
+    const commands = [`user -u ${uid}`];
+    
+    if (gid) commands.push(`gid ${gid}`);
+    if (username) commands.push(`username ${username}`);
+    if (password) commands.push(`password ${password}`);
+    
+    commands.push('ok');
+    commands.push('persist');
+
+    await jcli.executeSequence(commands);
     
     return NextResponse.json({ message: 'User updated successfully' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('Unable to open the database') || message.includes('code 14') || message.includes('Read-only')) {
-      return NextResponse.json({ message: 'Action simulated (Vercel Read-Only Demo)' });
-    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function parseStats(output: string) {
+  const stats: Record<string, string> = {};
+  const lines = output.split('\n');
+  
+  lines.forEach(line => {
+    const cleanLine = line.trim();
+    if(cleanLine.startsWith('#')) {
+      const parts = cleanLine.substring(1).split(/\s+/);
+      if(parts.length >= 2) {
+        stats[parts[0].toLowerCase()] = parts[1];
+      }
+    }
+  });
+  
+  return stats;
+}
+
+function parseUserStats(output: string) {
+  const stats: Record<string, string> = {};
+  const lines = output.split('\n');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line.startsWith('#') || line.startsWith('#Total') || line.startsWith('#User')) continue;
+    
+    const cleanLine = line.substring(1).trim();
+    if (!cleanLine || cleanLine.toLowerCase().startsWith('incorrect')) continue;
+    
+    const parts = cleanLine.split(/\s+/);
+    if (parts.length >= 2) {
+      stats[parts[0]] = parts[1]; // Map UID to SMPP Bound connections
+    }
+  }
+  
+  return stats;
+}
+
+function parseUsers(output: string, userStats: Record<string, string>) {
+  const lines = output.split('\n');
+  const users = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line.startsWith('#') || line.startsWith('#Total') || line.startsWith('#Uid')) continue;
+    
+    const cleanLine = line.substring(1).trim();
+    if (!cleanLine || cleanLine.toLowerCase().startsWith('incorrect')) continue;
+    
+    const parts = cleanLine.split(/\s+/);
+    
+    if (parts.length >= 4) {
+      users.push({
+        uid: parts[0],
+        gid: parts[1],
+        balance: parts[2],
+        mt: parts[3],
+        throughput: parts[4] || 'ND',
+        bound_connections: userStats[parts[0]] || '0'
+      });
+    }
+  }
+  
+  return users;
 }
